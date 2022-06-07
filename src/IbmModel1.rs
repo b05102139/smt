@@ -13,7 +13,6 @@ pub struct IbmModel1 {
     pub total_iterations: i32,
     pub prob_table: Vec<Vec<f64>>,
     transposed_prob_table: Vec<Vec<f64>>,
-    pub highest_prob: HashMap<String, String>,
 }
 
 impl IbmModel1 {
@@ -28,7 +27,6 @@ impl IbmModel1 {
             total_iterations: 0,
             prob_table: vec![vec![0.0; 0]; 0],
             transposed_prob_table: vec![vec![0.0; 0]; 0],
-            highest_prob: HashMap::new(),
         }
     }
 
