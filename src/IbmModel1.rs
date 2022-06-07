@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead, Read};
 use std::string::String;
-use ndarray::{Array, Array2, Axis};
 
 pub struct IbmModel1 {
     pub e_corpus_path: String,
@@ -12,7 +11,8 @@ pub struct IbmModel1 {
     e_words_inverted: HashMap<i32, String>,
     f_words_inverted: HashMap<i32, String>,
     pub total_iterations: i32,
-    pub prob_table: Array2::<f64>,
+    pub prob_table: Vec<Vec<f64>>,
+    transposed_prob_table: Vec<Vec<f64>>,
     pub highest_prob: HashMap<String, String>,
 }
 
@@ -26,13 +26,13 @@ impl IbmModel1 {
             e_words_inverted: HashMap::new(),
             f_words_inverted: HashMap::new(),
             total_iterations: 0,
-            prob_table: Array2::<f64>::zeros((3,3)),
+            prob_table: vec![vec![0.0; 0]; 0],
+            transposed_prob_table: vec![vec![0.0; 0]; 0],
             highest_prob: HashMap::new(),
         }
     }
 
-    pub fn iterate(&mut self, num_iterations: i32, delta: f64) -> std::io::Result<()> {
-        let mut previous_table:Array2::<f64> = self.prob_table.clone();
+    pub fn iterate(&mut self, num_iterations: i32) -> std::io::Result<()> {
         println!("Starting iteration...");
         for epoch in 0..num_iterations {
             let mut e_sentences = BufReader::new(File::open(&mut *self.e_corpus_path)?);
@@ -46,10 +46,10 @@ impl IbmModel1 {
             let e_sentence = e_f_sentence.0?.to_lowercase();
             let e_sentence: Vec<_> = e_sentence.split_whitespace().collect();
             let f_sentence = format!("{} {}", "NULL", e_f_sentence.1?.to_lowercase());
-            let mut f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
+            let f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
             for e_word in e_sentence.iter() {
                 for f_word in f_sentence.iter() {
-                    total_s.insert(e_word.to_string(), self.prob_table[[*self.e_words.get(&e_word.to_string()).unwrap() as usize, *self.f_words.get(&f_word.to_string()).unwrap() as usize]] + if total_s.contains_key(&e_word.to_string()) { total_s[&e_word.to_string()] } else { 0.0 });
+                    total_s.insert(e_word.to_string(), self.prob_table[*self.e_words.get(&e_word.to_string()).unwrap() as usize][*self.f_words.get(&f_word.to_string()).unwrap() as usize] + if total_s.contains_key(&e_word.to_string()) { total_s[&e_word.to_string()] } else { 0.0 });
                 }
             }
         }
@@ -61,10 +61,10 @@ impl IbmModel1 {
             let e_sentence = e_f_sentence.0?.to_lowercase();
             let e_sentence: Vec<_> = e_sentence.split_whitespace().collect();
             let f_sentence = format!("{} {}", "NULL", e_f_sentence.1?.to_lowercase());
-            let mut f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
+            let f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
             for e_word in e_sentence.iter() {
                 for f_word in f_sentence.iter() {
-                    let temp: f64 = self.prob_table[[*self.e_words.get(&e_word.to_string()).unwrap() as usize, *self.f_words.get(&f_word.to_string()).unwrap() as usize]] / total_s[&e_word.to_string()];
+                    let temp: f64 = self.prob_table[*self.e_words.get(&e_word.to_string()).unwrap() as usize][*self.f_words.get(&f_word.to_string()).unwrap() as usize] / total_s[&e_word.to_string()];
                     count.insert((e_word.to_string(), f_word.to_string()), temp + if count.contains_key(&(e_word.to_string(), f_word.to_string())) { count[&(e_word.to_string(), f_word.to_string())] } else { 0.0 });
                     total.insert(f_word.to_string(), temp + if total.contains_key(&f_word.to_string()) { total[&f_word.to_string()] } else { 0.0 });
                 } 
@@ -72,16 +72,11 @@ impl IbmModel1 {
         }
 
         for (e_word, f_word) in count.keys() {
-            self.prob_table[[*self.e_words.get(&e_word.to_string()).unwrap() as usize, *self.f_words.get(&f_word.to_string()).unwrap() as usize]] = count[&(e_word.to_string(), f_word.to_string())] / total[&f_word.to_string()];
+            self.prob_table[*self.e_words.get(&e_word.to_string()).unwrap() as usize][*self.f_words.get(&f_word.to_string()).unwrap() as usize] = count[&(e_word.to_string(), f_word.to_string())] / total[&f_word.to_string()];
         }
-        println!("Delta: {}", table_distance(&self.prob_table, &previous_table));
-        if delta > table_distance(&self.prob_table, &previous_table) {
-            println!("Tables have converged under the specified delta.");
-            break
-        }
-        previous_table = self.prob_table.clone();
         println!("Iteration {} finished", epoch+1);
     }
+    self.transposed_prob_table = transpose(self.prob_table.clone());
     self.total_iterations += num_iterations;
     Ok(())
     }
@@ -89,7 +84,7 @@ impl IbmModel1 {
     pub fn initialize_prob_table(&mut self) -> std::io::Result<()> {
         println!("Initializing probabilities uniformly...");
         let default_value: f64 = 1.0 / self.f_words.len() as f64;
-        let default_table = Array::from_elem((self.e_words.len(), self.f_words.len()), default_value);
+        let default_table = vec![vec![default_value; self.f_words.len()]; self.e_words.len()];
         self.prob_table = default_table;
         Ok(())
     }
@@ -135,31 +130,27 @@ impl IbmModel1 {
     pub fn decode(&self, f_sent: String) -> Vec<String> {
         let mut vec1: Vec<String> = vec![];
         for i in f_sent.split_whitespace() {
-            let word = self.highest_prob.get(i);
-            match word {
-                Some(word) => {
-                    vec1.push(word.to_string()); 
-                },
-                None => vec1.push(String::from("<UNK>")),
+            let col_num = self.f_words.get(i);
+            match col_num {
+                Some(col_num) => {
+                    let f_word_col = self.transposed_prob_table[*col_num as usize].clone();
+                    let (max_idx, max_val) =
+                        f_word_col.iter()
+                        .enumerate()
+                        .fold((0, f_word_col[0]), |(idx_max, val_max), (idx, val)| {
+                            if &val_max > val {
+                                (idx_max, val_max)
+                            } else {
+                                (idx, *val)
+                            }
+                        });
+            let word = self.e_words_inverted.get(&(max_idx as i32));
+            vec1.push(word.unwrap().to_string()); 
+            },
+            None => vec1.push(String::from("<UNK>")),
             };
         }
-        return vec1
-    }
-
-    pub fn cache_translations(&mut self) {
-        for (i, row) in self.prob_table.axis_iter(Axis(1)).enumerate() {
-            let (max_idx, max_val) =
-                row.iter()
-                    .enumerate()
-                    .fold((0, row[0]), |(idx_max, val_max), (idx, val)| {
-                        if &val_max > val {
-                            (idx_max, val_max)
-                        } else {
-                            (idx, *val)
-                        }
-                    });
-                    self.highest_prob.insert(self.f_words_inverted[&(i as i32)].clone(), self.e_words_inverted[&(max_idx as i32)].clone());
-        }
+     return vec1
     }
 }
 
@@ -171,11 +162,16 @@ fn invert_hashmap(map: HashMap<String, i32>) -> HashMap<i32, String> {
     return invert;
 }
 
-fn table_distance(current_table: &Array2::<f64>, previous_table: &Array2::<f64>) -> f64 {
-    let zipped = current_table.into_iter().zip(previous_table.into_iter());
-    let mut sum_of_dist: f64 = 0.0;
-    for i in zipped {
-        sum_of_dist += (i.0 - i.1).abs();
-    }
-    return sum_of_dist;
+fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    assert!(!v.is_empty());
+    let len = v[0].len();
+    let mut iters: Vec<_> = v.into_iter().map(|n| n.into_iter()).collect();
+    (0..len)
+        .map(|_| {
+            iters
+                .iter_mut()
+                .map(|n| n.next().unwrap())
+                .collect::<Vec<T>>()
+        })
+        .collect()
 }
