@@ -4,15 +4,15 @@ use std::io::{BufReader, BufRead, Read};
 use std::string::String;
 
 pub struct IbmModel1 {
-    pub e_corpus_path: String,
-    pub f_corpus_path: String,
-    pub e_words: HashMap<String, i32>,
-    pub f_words: HashMap<String, i32>,
-    e_words_inverted: HashMap<i32, String>,
-    f_words_inverted: HashMap<i32, String>,
-    pub total_iterations: i32,
-    pub prob_table: Vec<Vec<f64>>,
-    transposed_prob_table: Vec<Vec<f64>>,
+    pub e_corpus_path: String, // path to target language corpus
+    pub f_corpus_path: String, // path to source language corpus
+    pub e_words: HashMap<String, i32>, // target language word-index dict
+    pub f_words: HashMap<String, i32>, // source language word-index dict
+    e_words_inverted: HashMap<i32, String>, // invert target lang dict for decoding
+    f_words_inverted: HashMap<i32, String>, // invert source lang dict for decoding
+    pub total_iterations: i32, // desired number of iterations; allows one to continue training by adding addtional iterations
+    pub prob_table: Vec<Vec<f64>>, // translation probability table of translating a source word into any of the target words
+    transposed_prob_table: Vec<Vec<f64>>, // transpose of the above, for ease of decoding
 }
 
 impl IbmModel1 {
@@ -30,9 +30,11 @@ impl IbmModel1 {
         }
     }
 
+    // code for iteration of the model
     pub fn iterate(&mut self, num_iterations: i32) -> std::io::Result<()> {
         println!("Starting iteration...");
         for epoch in 0..num_iterations {
+            // read in sentences
             let mut e_sentences = BufReader::new(File::open(&mut *self.e_corpus_path)?);
             let mut f_sentences = BufReader::new(File::open(&mut *self.f_corpus_path)?);
 
@@ -43,6 +45,7 @@ impl IbmModel1 {
         for e_f_sentence in e_sentences.by_ref().lines().zip(f_sentences.by_ref().lines()) {
             let e_sentence = e_f_sentence.0?.to_lowercase();
             let e_sentence: Vec<_> = e_sentence.split_whitespace().collect();
+            // add NULL to account for dropping words
             let f_sentence = format!("{} {}", "NULL", e_f_sentence.1?.to_lowercase());
             let f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
             for e_word in e_sentence.iter() {
@@ -58,6 +61,7 @@ impl IbmModel1 {
         for e_f_sentence in e_sentences.by_ref().lines().zip(f_sentences.by_ref().lines()) {
             let e_sentence = e_f_sentence.0?.to_lowercase();
             let e_sentence: Vec<_> = e_sentence.split_whitespace().collect();
+            // add NULL to drop words
             let f_sentence = format!("{} {}", "NULL", e_f_sentence.1?.to_lowercase());
             let f_sentence: Vec<_> = f_sentence.split_whitespace().collect();
             for e_word in e_sentence.iter() {
@@ -79,6 +83,7 @@ impl IbmModel1 {
     Ok(())
     }
 
+    // initialize the probability table uniformly
     pub fn initialize_prob_table(&mut self) -> std::io::Result<()> {
         println!("Initializing probabilities uniformly...");
         let default_value: f64 = 1.0 / self.f_words.len() as f64;
@@ -87,6 +92,7 @@ impl IbmModel1 {
         Ok(())
     }
 
+    // fill word-index dict
     pub fn fill_dict(&mut self) -> std::io::Result<()> {
         let src_input = File::open(&mut *self.f_corpus_path)?;
         let tgt_input = File::open(&mut *self.e_corpus_path)?;
@@ -152,6 +158,7 @@ impl IbmModel1 {
     }
 }
 
+// for ease of decoding
 fn invert_hashmap(map: HashMap<String, i32>) -> HashMap<i32, String> {
     let mut invert = HashMap::new();
     for (key, value) in map.into_iter() {
@@ -160,6 +167,7 @@ fn invert_hashmap(map: HashMap<String, i32>) -> HashMap<i32, String> {
     return invert;
 }
 
+// for ease of decoding
 fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     assert!(!v.is_empty());
     let len = v[0].len();
