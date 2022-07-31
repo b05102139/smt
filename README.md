@@ -21,6 +21,10 @@ Which builds the project. After the project is build, the code can be run while 
 
 The source and target corpora are to be specified in the main.rs file under src/, which should be parallel corpora of the two languages, each put in their own .txt file.
 
+# Code in Paper - Word Segmentation:
+
+The word_segmentation.ipynb file assumes the data to exist under data/, which is downloadable via https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=realm&dataSetSn=129. This produces the segmentation data used for phrase-based MT training in Moses.
+
 # Code in Paper - Moses Training:
 
 ## 1. Install Giza++ and Moses
@@ -122,8 +126,6 @@ cd ..
 ```
 
 ### Binarise the phrase-table and lexicalized reordering models
-```bash
-```
 ```bash
 cd working
 mkdir binarised-model
