@@ -21,10 +21,6 @@ Which builds the project. After the project is build, the code can be run while 
 
 The source and target corpora are to be specified in the main.rs file under src/, which should be parallel corpora of the two languages, each put in their own .txt file.
 
-# Code in Paper - Word Segmentation:
-
-For the segmentation process
-
 # Code in Paper - Moses Training:
 
 ## 1. Install Giza++ and Moses
