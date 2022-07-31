@@ -3,6 +3,11 @@ This repo contains code written for the CL Team Lab project at the Institute of 
 
 It contains a Rust implementation of IBM Model 1, along with Python implementations of byte-pair encoding and BLEU for tokenization and evaluation.
 
+# Korean-Chinese data:
+
+To replicate our studies, please acquire the Korean-Chinese data through the following link:
+ https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=realm&dataSetSn=129
+
 # Baseline Model - IBM-Model 1:
 
 To build the Rust code, we assume that Rust and Cargo is already installed. Please follow the instructions on [this page](https://www.rust-lang.org/tools/install), which details how to use rustup to download Rust, and will have Cargo installed alongside automatically.
@@ -21,9 +26,11 @@ Which builds the project. After the project is build, the code can be run while 
 
 The source and target corpora are to be specified in the main.rs file under src/, which should be parallel corpora of the two languages, each put in their own .txt file.
 
+The BPE for ko-zh.ipynb file tokenizes the Chinese-Korean data, and the bleu_score.ipynb file evaluates the results.
+
 # Code in Paper - Word Segmentation:
 
-The word_segmentation.ipynb file assumes the data to exist under data/, which is downloadable via https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=realm&dataSetSn=129. This produces the segmentation data used for phrase-based MT training in Moses.
+The word_segmentation.ipynb file assumes the Korean-Chinese data to exist under data/. This produces the segmentation data used for phrase-based MT training in Moses.
 
 # Code in Paper - Moses Training:
 
